@@ -33,6 +33,7 @@ yarn-error.log*
 
 # local data
 /data/*.json
+debug-network.js
 
 # env files (can opt-in for committing if needed)
 .env*

@@ -67,9 +67,15 @@ export class WeReadApi {
 
     constructor(cookie: string) {
         this.cookie = cookie;
+        // Auto-detect proxy: 
+        // If HTTP_PROXY/HTTPS_PROXY envs are set (by VPN/System), Axios uses them automatically.
+        // If NOT set, we explicitly set `proxy: false` to avoid stale config issues.
+        const hasProxy = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
+
         this.client = axios.create({
             timeout: 60000,
-            headers: this.getHeaders()
+            headers: this.getHeaders(),
+            proxy: hasProxy ? undefined : false
         });
     }
 
@@ -119,9 +125,38 @@ export class WeReadApi {
         }
     }
 
+    private async makeRequest<T>(url: string, config: any = {}): Promise<AxiosResponse<T>> {
+        try {
+            return await this.client.get<T>(url, config);
+        } catch (error: any) {
+            // Check for proxy/network related errors
+            const isNetworkError = error.code === 'ECONNREFUSED' ||
+                error.code === 'ETIMEDOUT' ||
+                error.code === 'czx' || // Sometimes weird codes appear
+                (error.message && error.message.includes('proxy'));
+
+            if (isNetworkError) {
+                console.warn(`[WeReadApi] Network error detected (${error.code}). Retrying with direct connection...`);
+                try {
+                    // Create a temporary direct client
+                    const directClient = axios.create({
+                        timeout: 60000,
+                        headers: this.getHeaders(),
+                        proxy: false
+                    });
+                    return await directClient.get<T>(url, config);
+                } catch (retryError) {
+                    // If retry fails, throw original error or retry error
+                    throw retryError;
+                }
+            }
+            throw error;
+        }
+    }
+
     private async visitHomepage(): Promise<void> {
         try {
-            const response = await this.client.get(WEREAD_BASE_URL, {
+            const response = await this.makeRequest(WEREAD_BASE_URL, {
                 headers: {
                     ...this.getHeaders(),
                     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
@@ -142,7 +177,7 @@ export class WeReadApi {
         await new Promise(r => setTimeout(r, Math.random() * 500 + 500));
 
         try {
-            const response = await this.client.get<WeReadNotebookResponse>(WEREAD_NOTEBOOKS_URL);
+            const response = await this.makeRequest<WeReadNotebookResponse>(WEREAD_NOTEBOOKS_URL);
             this.updateCookie(response);
             return response.data;
         } catch (error: unknown) {
@@ -186,7 +221,7 @@ export class WeReadApi {
 
     private async fetchBestBookmarks(bookId: string): Promise<WeReadBookmark[]> {
         try {
-            const response = await this.client.get<BestBookmarkResponse>("https://weread.qq.com/web/book/bestbookmarks", {
+            const response = await this.makeRequest<BestBookmarkResponse>("https://weread.qq.com/web/book/bestbookmarks", {
                 params: { bookId }
             });
             const data = response.data;
@@ -206,7 +241,7 @@ export class WeReadApi {
 
     private async fetchBookmarkList(bookId: string): Promise<WeReadBookmark[]> {
         try {
-            const response = await this.client.get<BookmarkListResponse>(WEREAD_BOOKMARKLIST_URL, {
+            const response = await this.makeRequest<BookmarkListResponse>(WEREAD_BOOKMARKLIST_URL, {
                 params: { bookId }
             });
             const data = response.data;
@@ -223,7 +258,7 @@ export class WeReadApi {
     private async fetchReviewList(bookId: string): Promise<WeReadBookmark[]> {
         const url = "https://weread.qq.com/web/review/list";
         try {
-            const response = await this.client.get<ReviewListResponse>(url, {
+            const response = await this.makeRequest<ReviewListResponse>(url, {
                 params: {
                     bookId,
                     listType: 4,
