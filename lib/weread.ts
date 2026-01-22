@@ -209,8 +209,12 @@ export const getRandomBookmarkFromBooks = async (books: Book[]): Promise<Bookmar
 
   // 1. Filter Books with actual highlights
   // Use noteCount or bookmarkCount
+  // AND Filter out Blacklisted titles
+  const EXCLUDED_TITLES = ['房思琪的初恋乐园'];
+
   const booksWithContent = books.filter(b =>
-    (b.noteCount && b.noteCount > 0) || (b.bookmarkCount && b.bookmarkCount > 0)
+    ((b.noteCount && b.noteCount > 0) || (b.bookmarkCount && b.bookmarkCount > 0)) &&
+    !EXCLUDED_TITLES.some(t => b.title.includes(t))
   );
 
   // 2. Weighted Random Selection (Prioritize books with more notes)

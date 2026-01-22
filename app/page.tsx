@@ -107,8 +107,31 @@ export default function Home() {
       if (hasSyncedData()) {
         const localBookmarks = getSyncedData();
         if (localBookmarks.length > 0) {
-          const random = localBookmarks[Math.floor(Math.random() * localBookmarks.length)];
-          nextBookmarkRef.current = random;
+
+          // --- Custom Algorithm (Same as loadNewBookmark) ---
+          const EXCLUDED_TITLES = ['房思琪的初恋乐园'];
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          let candidatePool = localBookmarks.filter((b: any) =>
+            !EXCLUDED_TITLES.some(t => b.title.includes(t))
+          );
+          if (candidatePool.length === 0) candidatePool = localBookmarks;
+
+          const PRIORITY_TITLES = [
+            '沧浪之水', '教父', '认知觉醒', '也许你该找个人谈谈', '腰背维修师', '学习觉醒'
+          ];
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const priorityPool = candidatePool.filter((b: any) =>
+            PRIORITY_TITLES.some(t => b.title.includes(t))
+          );
+
+          let selected: Bookmark;
+          if (priorityPool.length > 0 && Math.random() < 0.8) {
+            selected = priorityPool[Math.floor(Math.random() * priorityPool.length)];
+          } else {
+            selected = candidatePool[Math.floor(Math.random() * candidatePool.length)];
+          }
+
+          nextBookmarkRef.current = selected;
           isPrefetchingRef.current = false;
           return;
         }
@@ -147,8 +170,46 @@ export default function Home() {
         const localBookmarks = getSyncedData();
         if (localBookmarks.length > 0) {
           console.log('[Mode] Using Local Synced Data');
-          const random = localBookmarks[Math.floor(Math.random() * localBookmarks.length)];
-          setBookmark(random);
+
+          // --- Custom Algorithm for Offline Mode ---
+
+          // 1. Blacklist Filtering
+          const EXCLUDED_TITLES = ['房思琪的初恋乐园'];
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          let candidatePool = localBookmarks.filter((b: any) =>
+            !EXCLUDED_TITLES.some(t => b.title.includes(t))
+          );
+
+          if (candidatePool.length === 0) {
+            // Fallback if user blocked everything (rare)
+            candidatePool = localBookmarks;
+          }
+
+          // 2. Priority Boosting
+          // Instead of complex weights, we separate the pool and bias the random choice.
+          const PRIORITY_TITLES = [
+            '沧浪之水', '教父', '认知觉醒', '也许你该找个人谈谈', '腰背维修师', '学习觉醒'
+          ];
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const priorityPool = candidatePool.filter((b: any) =>
+            PRIORITY_TITLES.some(t => b.title.includes(t))
+          );
+
+          let selected: Bookmark;
+
+          // Logic: If priority books exist in local data:
+          // 80% chance to pick from Priority Pool
+          // 20% chance to pick from General Pool (to keep some variety)
+          if (priorityPool.length > 0 && Math.random() < 0.8) {
+            console.log('[Offline] Boosted selection from Priority Pool');
+            selected = priorityPool[Math.floor(Math.random() * priorityPool.length)];
+          } else {
+            // Normal selection
+            selected = candidatePool[Math.floor(Math.random() * candidatePool.length)];
+          }
+
+          setBookmark(selected);
           setLoading(false);
           return;
         }
