@@ -288,6 +288,7 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
             isPiP={true}
             isCompact={isCompact}
             onToggleCompact={toggleCompact}
+            scale={isCompact ? 0.6 : 0.8} // Fixed scale for now to ensure fit
           />
         </div>,
         pipWindow.document.body

@@ -12,9 +12,10 @@ interface TimerDisplayProps {
     isPiP?: boolean;
     isCompact?: boolean;
     onToggleCompact?: () => void;
+    scale?: number; // Scaling factor for responsiveness
 }
 
-export const TimerDisplay: React.FC<TimerDisplayProps> = ({ mode, timeStr, isActive, totalSeconds, timeLeft, canvasRef, isPiP, isCompact, onToggleCompact }) => {
+export const TimerDisplay: React.FC<TimerDisplayProps> = ({ mode, timeStr, isActive, totalSeconds, timeLeft, canvasRef, isPiP, isCompact, onToggleCompact, scale = 1 }) => {
     const internalCanvasRef = useRef<HTMLCanvasElement>(null);
 
     // Decide which ref to use: the parent one (for video stream) or internal one
@@ -95,10 +96,12 @@ export const TimerDisplay: React.FC<TimerDisplayProps> = ({ mode, timeStr, isAct
 
     }, [mode, timeStr, isActive, totalSeconds, timeLeft, canvasToUse]);
 
-    // --- COMPACT MODE UI ---
     if (isCompact) {
         return (
-            <div className="flex flex-col items-center justify-center p-4">
+            <div
+                className="flex flex-col items-center justify-center p-4 transition-transform origin-center"
+                style={{ transform: `scale(${scale})` }}
+            >
                 {/* Top Row: Mini Controls */}
                 {isPiP && (
                     <button
@@ -127,7 +130,10 @@ export const TimerDisplay: React.FC<TimerDisplayProps> = ({ mode, timeStr, isAct
 
     // --- STANDARD MODE UI ---
     return (
-        <div className="relative group z-10 select-none flex flex-col items-center justify-center">
+        <div
+            className="relative group z-10 select-none flex flex-col items-center justify-center transition-transform origin-center"
+            style={{ transform: `scale(${scale})` }}
+        >
             {/* PiP Minimize Button */}
             {isPiP && (
                 <button
