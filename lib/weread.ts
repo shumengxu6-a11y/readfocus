@@ -165,8 +165,8 @@ export const getRandomBookmarkFromBooks = async (books: Book[]): Promise<Bookmar
   const seenBookmarks = getSeenBookmarks();
 
   // 3. Try finding a bookmark, prioritizing UNSEEN content
-  // We check up to 10 books. If a book has unseen content, we use it immediately.
-  const limit = Math.min(candidateBooks.length, 10);
+  // Increased limit to 30 to reduce chance of empty results on books with ghost data
+  const limit = Math.min(candidateBooks.length, 30);
 
   // Store a backup in case we fail to find any unseen content
   let backupBookmark: { bookmark: Bookmark, book: Book } | null = null;
@@ -203,8 +203,7 @@ export const getRandomBookmarkFromBooks = async (books: Book[]): Promise<Bookmar
     }
   }
 
-  // 4. Fallback: If we checked 'limit' books and found NO unseen content,
-  // return the backup (a seen bookmark) if available.
+  // 4. Fallback A: Use seen bookmark from the random sampling
   if (backupBookmark) {
     console.log('[WeRead] No unseen bookmarks found in sampled books, reusing seen bookmark.');
     return {
@@ -212,6 +211,30 @@ export const getRandomBookmarkFromBooks = async (books: Book[]): Promise<Bookmar
       title: backupBookmark.book.title,
       author: backupBookmark.book.author
     };
+  }
+
+  // 5. Fallback B (Fail-Safe): If we checked 30 books and found NOTHING (all empty/failed),
+  // pick the single book with the MOST notes and force fetch it.
+  // This prevents "No highlights found" error when valid content exists but wasn't sampled.
+  try {
+    const bookWithMostNotes = [...booksWithContent].sort((a, b) =>
+      ((b.noteCount || 0) + (b.bookmarkCount || 0)) - ((a.noteCount || 0) + (a.bookmarkCount || 0))
+    )[0];
+
+    if (bookWithMostNotes) {
+      console.log(`[WeRead] Fail-safe: Fetching from largest book: ${bookWithMostNotes.title}`);
+      const bookmarks = await fetchBookmarks(bookWithMostNotes.bookId);
+      if (bookmarks.length > 0) {
+        const randomBookmark = bookmarks[Math.floor(Math.random() * bookmarks.length)];
+        return {
+          ...randomBookmark,
+          title: bookWithMostNotes.title,
+          author: bookWithMostNotes.author
+        };
+      }
+    }
+  } catch (e) {
+    console.error('[WeRead] Fail-safe also failed:', e);
   }
 
   return null;
