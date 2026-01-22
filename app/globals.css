@@ -1,8 +1,11 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --accent-glow: rgba(59, 130, 246, 0.5); /* Blue glow */
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --glass-border: rgba(255, 255, 255, 0.1);
 }
 
 @theme inline {
@@ -12,17 +15,30 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  overflow-x: hidden; /* Prevent horizontal scroll */
+}
+
+/* Glassmorphism Utilities */
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+/* Animations */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 15px var(--accent-glow); }
+  50% { box-shadow: 0 0 25px var(--accent-glow), 0 0 10px var(--accent-glow); }
+}
+
+.animate-glow {
+  animation: pulse-glow 3s infinite;
 }
 
 @keyframes fadeIn {
@@ -30,29 +46,15 @@ body {
   to { opacity: 1; }
 }
 
-@keyframes zoomIn {
-  from { transform: scale(0.95); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
-}
-
-@keyframes slideInUp {
+@keyframes slideUp {
   from { transform: translateY(20px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
 
-.animate-in {
-  animation-duration: 0.5s;
-  animation-fill-mode: both;
-}
-
 .fade-in {
-  animation-name: fadeIn;
+  animation: fadeIn 0.8s ease-out forwards;
 }
 
-.zoom-in {
-  animation-name: zoomIn;
-}
-
-.slide-in-from-bottom-4 {
-  animation-name: slideInUp;
+.slide-up {
+  animation: slideUp 0.6s ease-out forwards;
 }

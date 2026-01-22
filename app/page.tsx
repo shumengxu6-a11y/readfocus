@@ -1,83 +1,99 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Timer } from "@/components/Timer";
+
+import { Timer, TimerHandle } from "@/components/Timer";
 import { ReadingCard } from "@/components/ReadingCard";
 import { BookOpen } from "lucide-react";
+import { clsx } from "clsx";
 import { fetchNotebooks, getRandomBookmarkFromBooks, Bookmark, Book, WereadError } from "@/lib/weread";
 
 export default function Home() {
+  const [complete, setComplete] = useState(false);
   const [isBreak, setIsBreak] = useState(false);
   const [bookmark, setBookmark] = useState<Bookmark | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<WereadError | null>(null);
-  
+
+  const timerRef = useRef<TimerHandle>(null);
+
   // Cache for books and preloaded bookmark
   const booksRef = useRef<Book[]>([]);
   const nextBookmarkRef = useRef<Bookmark | null>(null);
   const isPrefetchingRef = useRef(false);
 
+  /* ... */
+
+  const handleTimerComplete = () => {
+    setComplete(true);
+    setIsBreak(true);
+    // Start 5 min break automatically
+    if (timerRef.current) {
+      timerRef.current.startBreak(5);
+    }
+  };
+
   // Pre-fetch a bookmark in the background
   const prefetchBookmark = async () => {
     if (isPrefetchingRef.current || nextBookmarkRef.current) return;
-    
+
     isPrefetchingRef.current = true;
     console.log('[App] Prefetching next bookmark...');
-    
+
     try {
-       if (booksRef.current.length === 0) {
-          booksRef.current = await fetchNotebooks();
-       }
-       const newBookmark = await getRandomBookmarkFromBooks(booksRef.current);
-       if (newBookmark) {
-           nextBookmarkRef.current = newBookmark;
-           console.log('[App] Bookmark prefetched ready.');
-       }
+      if (booksRef.current.length === 0) {
+        booksRef.current = await fetchNotebooks();
+      }
+      const newBookmark = await getRandomBookmarkFromBooks(booksRef.current);
+      if (newBookmark) {
+        nextBookmarkRef.current = newBookmark;
+        console.log('[App] Bookmark prefetched ready.');
+      }
     } catch (e) {
-       console.warn('[App] Prefetch failed:', e);
+      console.warn('[App] Prefetch failed:', e);
     } finally {
-       isPrefetchingRef.current = false;
+      isPrefetchingRef.current = false;
     }
   };
 
   const loadNewBookmark = async () => {
     setLoading(true);
     setError(null);
-    
+
     // If we have a prefetched bookmark, use it immediately
     if (nextBookmarkRef.current) {
-        setBookmark(nextBookmarkRef.current);
-        nextBookmarkRef.current = null; // Clear used
-        setLoading(false);
-        prefetchBookmark(); // Queue next one
-        return;
+      setBookmark(nextBookmarkRef.current);
+      nextBookmarkRef.current = null; // Clear used
+      setLoading(false);
+      prefetchBookmark(); // Queue next one
+      return;
     }
 
     // Otherwise fetch normally
     try {
-       if (booksRef.current.length === 0) {
-          booksRef.current = await fetchNotebooks();
-       }
-       const newBookmark = await getRandomBookmarkFromBooks(booksRef.current);
-       setBookmark(newBookmark);
-       
-       // Trigger prefetch for the *next* time
-       prefetchBookmark();
+      if (booksRef.current.length === 0) {
+        booksRef.current = await fetchNotebooks();
+      }
+      const newBookmark = await getRandomBookmarkFromBooks(booksRef.current);
+      setBookmark(newBookmark);
+
+      // Trigger prefetch for the *next* time
+      prefetchBookmark();
     } catch (e: any) {
-       console.error(e);
-       if (e.name === 'WereadError' || e.code === 'SESSION_EXPIRED' || e.response?.status === 401) {
-         setError(e);
-       } else {
-         setError(new WereadError('Failed to fetch content. Please try again.'));
-       }
+      console.error(e);
+      if (e.name === 'WereadError' || e.code === 'SESSION_EXPIRED' || e.response?.status === 401) {
+        setError(e);
+      } else {
+        setError(new WereadError('Failed to fetch content. Please try again.'));
+      }
     } finally {
-       setLoading(false);
+      setLoading(false);
     }
   };
 
   // Initial load / Prefetch when mounting
   useEffect(() => {
-      prefetchBookmark();
+    prefetchBookmark();
   }, []);
 
   // When break starts, load content
@@ -91,41 +107,60 @@ export default function Home() {
   }, [isBreak]);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center font-sans text-gray-900 selection:bg-gray-200">
-      
-      <header className="absolute top-0 left-0 p-6 flex items-center space-x-2 opacity-50 hover:opacity-100 transition-opacity">
-        <div className="bg-black text-white p-2 rounded-lg">
-          <BookOpen size={20} />
+    <div className="min-h-screen relative flex items-center justify-center overflow-hidden">
+
+      {/* Background Gradient */}
+      <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-[#0a0a0a] to-[#111] z-0"></div>
+      <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] bg-blue-900/10 rounded-full blur-[120px] pointer-events-none"></div>
+
+      <header className="absolute top-0 left-0 p-8 flex items-center space-x-3 z-20">
+        <div className="bg-white/10 p-2 rounded-lg backdrop-blur-sm border border-white/5">
+          <BookOpen size={20} className="text-blue-400" />
         </div>
-        <span className="font-bold text-lg tracking-tight">ReadFocus</span>
+        <span className="font-bold text-lg tracking-wider text-white/80">ReadFocus</span>
       </header>
 
-      <div className="flex-1 flex flex-col items-center justify-center p-8 w-full max-w-2xl relative">
-        
-        {/* Persistent Timer for PiP stability */}
-        <div className={isBreak ? "absolute opacity-0 pointer-events-none" : "block w-full"}>
-          <Timer 
-            onComplete={() => setIsBreak(true)} 
+      <main className="relative z-10 w-full max-w-7xl px-8 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center min-h-[600px]">
+
+        {/* Left Col: Timer */}
+        <div className="flex justify-center transition-all duration-500">
+          <Timer
+            ref={timerRef}
+            onComplete={handleTimerComplete}
             quote={isBreak && bookmark ? bookmark.markText : null}
           />
         </div>
 
-        {isBreak && (
-           <div className="w-full z-10">
-             <ReadingCard 
-                bookmark={bookmark} 
-                loading={loading} 
-                error={error}
-                onNext={loadNewBookmark}
-                onClose={() => setIsBreak(false)}
-              />
-           </div>
-        )}
+        {/* Right Col: Card Area */}
+        <div className={clsx(
+          "transition-all duration-700 ease-out transform",
+          isBreak ? "opacity-100 translate-x-0" : "opacity-30 lg:opacity-50 blur-sm scale-95 pointer-events-none grayscale"
+        )}>
+          {isBreak ? (
+            <ReadingCard
+              bookmark={bookmark}
+              loading={loading}
+              error={error}
+              onNext={loadNewBookmark}
+              onClose={() => setIsBreak(false)}
+            />
+          ) : (
+            /* Placeholder/teaser when focusing */
+            <div className="hidden lg:flex glass-panel w-full max-w-lg mx-auto p-12 rounded-3xl min-h-[400px] flex-col items-center justify-center text-center border-white/5">
+              <p className="text-2xl font-serif text-white/20">
+                "Focus is the new IQ."
+              </p>
+              <p className="mt-4 text-xs tracking-widest text-white/10 uppercase">
+                Complete the session to unlock knowledge
+              </p>
+            </div>
+          )}
+        </div>
 
-      </div>
+      </main>
 
-      <footer className="absolute bottom-4 text-xs text-gray-400">
-        Focus. Read. Repeat.
+      <footer className="absolute bottom-6 text-xs text-gray-700 font-mono tracking-widest z-20">
+        DESIGNED FOR DEEP WORK
       </footer>
     </div>
   );
