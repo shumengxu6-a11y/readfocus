@@ -14,7 +14,7 @@ export interface TimerHandle {
 export type TimerMode = 'pomodoro' | 'custom' | 'countup' | 'break';
 
 interface TimerProps {
-  onComplete: (mode?: TimerMode) => void;
+  onComplete: (mode: TimerMode, durationSeconds: number) => void;
   quote?: string | null;
 }
 
@@ -202,7 +202,9 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
               setIsActive(false);
               notifyComplete();
               setTimeout(() => {
-                onComplete(mode); // Pass mode to parent
+                // Determine duration
+                const duration = mode === 'custom' ? customMinutes * 60 : (mode === 'break' ? breakMinutes * 60 : 25 * 60);
+                onComplete(mode, duration); // Pass mode to parent
               }, 0);
               return 0;
             }
@@ -351,7 +353,10 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
 
       {mode === 'countup' && isActive && (
         <button
-          onClick={() => { setIsActive(false); onComplete(); }}
+          onClick={() => {
+            setIsActive(false);
+            onComplete(mode, countUpTime);
+          }}
           className="px-6 py-2 rounded-lg bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30 transition-colors flex items-center gap-2"
         >
           <Coffee size={18} />

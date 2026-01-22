@@ -25,7 +25,7 @@ export default function Home() {
 
   /* ... */
 
-  const handleTimerComplete = (finishedMode?: string) => {
+  const handleTimerComplete = (finishedMode: string, durationSeconds: number) => {
     if (finishedMode === 'break') {
       // Break done -> Back to Focus
       setIsBreak(false);
@@ -42,9 +42,11 @@ export default function Home() {
       }
 
       // Dispatch Focus Event for Stats
-      // TODO: Ideally pass actual duration from Timer
-      const minutes = finishedMode === 'custom' ? 25 : 25; // Default/Assumption for now
-      window.dispatchEvent(new CustomEvent('focus-completed', { detail: { minutes } }));
+      // Use actual duration from Timer
+      const minutes = Math.max(0, Math.round(durationSeconds / 60));
+      if (minutes > 0) {
+        window.dispatchEvent(new CustomEvent('focus-completed', { detail: { minutes } }));
+      }
     }
   };
 
