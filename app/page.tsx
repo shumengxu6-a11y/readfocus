@@ -7,6 +7,7 @@ import { ReadingCard } from "@/components/ReadingCard";
 import { BookOpen } from "lucide-react";
 import { clsx } from "clsx";
 import { fetchNotebooks, getRandomBookmarkFromBooks, Bookmark, Book, WereadError } from "@/lib/weread";
+import { DailyStats } from "@/components/DailyStats";
 
 export default function Home() {
   const [complete, setComplete] = useState(false);
@@ -39,8 +40,14 @@ export default function Home() {
       if (timerRef.current) {
         timerRef.current.startBreak(5);
       }
+
+      // Dispatch Focus Event for Stats
+      // TODO: Ideally pass actual duration from Timer
+      const minutes = finishedMode === 'custom' ? 25 : 25; // Default/Assumption for now
+      window.dispatchEvent(new CustomEvent('focus-completed', { detail: { minutes } }));
     }
   };
+
 
   // Pre-fetch a bookmark in the background
   const prefetchBookmark = async () => {
@@ -167,6 +174,8 @@ export default function Home() {
         </div>
 
       </main>
+
+      <DailyStats />
 
       <footer className="absolute bottom-6 text-xs text-gray-700 font-mono tracking-widest z-20">
         DESIGNED FOR DEEP WORK
