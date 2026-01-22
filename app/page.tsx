@@ -18,8 +18,9 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<WereadError | null>(null);
 
-  // Cookie setup state
-  const [needsSetup, setNeedsSetup] = useState(true);
+  // Cookie setup state - start with checking (not assuming needs setup)
+  const [needsSetup, setNeedsSetup] = useState(false);
+  const [isCheckingCookie, setIsCheckingCookie] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
 
   const timerRef = useRef<TimerHandle>(null);
@@ -29,9 +30,34 @@ export default function Home() {
   const nextBookmarkRef = useRef<Bookmark | null>(null);
   const isPrefetchingRef = useRef(false);
 
-  // Check cookie on mount
+  // Check cookie on mount - try API first (works with CookieCloud), then check localStorage
   useEffect(() => {
-    setNeedsSetup(!hasUserCookie());
+    const checkCookieAvailability = async () => {
+      // If user has cookie in localStorage, we're good
+      if (hasUserCookie()) {
+        setNeedsSetup(false);
+        setIsCheckingCookie(false);
+        return;
+      }
+
+      // Try API to see if backend has cookie (via CookieCloud or env var)
+      try {
+        const response = await fetch('/api/weread/notebooks');
+        if (response.ok) {
+          // Backend has cookie, no setup needed
+          setNeedsSetup(false);
+        } else {
+          // Backend doesn't have cookie, show setup
+          setNeedsSetup(true);
+        }
+      } catch {
+        // Error means no cookie available
+        setNeedsSetup(true);
+      }
+      setIsCheckingCookie(false);
+    };
+
+    checkCookieAvailability();
   }, []);
 
   // Prevent double-firing of completion logic
@@ -146,8 +172,15 @@ export default function Home() {
   return (
     <div className="min-h-screen relative flex items-center justify-center overflow-hidden">
 
+      {/* Loading State while checking cookie */}
+      {isCheckingCookie && (
+        <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center">
+          <div className="text-white/60 text-sm">正在检查配置...</div>
+        </div>
+      )}
+
       {/* Cookie Setup Screen */}
-      {needsSetup && (
+      {!isCheckingCookie && needsSetup && (
         <CookieSetup onComplete={() => setNeedsSetup(false)} />
       )}
 
