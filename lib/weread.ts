@@ -312,27 +312,31 @@ export const getRandomBookmarkFromBooks = async (books: Book[]): Promise<Bookmar
   }
 
   // 5. Fallback B (Fail-Safe): If we checked 30 books and found NOTHING (all empty/failed),
-  // pick the single book with the MOST notes and force fetch it.
+  // pick the Top 5 books with the MOST notes and try them one by one.
   // This prevents "No highlights found" error when valid content exists but wasn't sampled.
   try {
-    const bookWithMostNotes = [...booksWithContent].sort((a, b) =>
+    const topBooks = [...booksWithContent].sort((a, b) =>
       ((b.noteCount || 0) + (b.bookmarkCount || 0)) - ((a.noteCount || 0) + (a.bookmarkCount || 0))
-    )[0];
+    ).slice(0, 5); // Try top 5 largest
 
-    if (bookWithMostNotes) {
-      console.log(`[WeRead] Fail-safe: Fetching from largest book: ${bookWithMostNotes.title}`);
-      const bookmarks = await fetchBookmarks(bookWithMostNotes.bookId);
-      if (bookmarks.length > 0) {
-        const randomBookmark = bookmarks[Math.floor(Math.random() * bookmarks.length)];
-        return {
-          ...randomBookmark,
-          title: bookWithMostNotes.title,
-          author: bookWithMostNotes.author
-        };
+    for (const bookWithMostNotes of topBooks) {
+      console.log(`[WeRead] Fail-safe: Trying large book: ${bookWithMostNotes.title}`);
+      try {
+        const bookmarks = await fetchBookmarks(bookWithMostNotes.bookId);
+        if (bookmarks.length > 0) {
+          const randomBookmark = bookmarks[Math.floor(Math.random() * bookmarks.length)];
+          return {
+            ...randomBookmark,
+            title: bookWithMostNotes.title,
+            author: bookWithMostNotes.author
+          };
+        }
+      } catch (e) {
+        console.warn(`[WeRead] Fail-safe failed for ${bookWithMostNotes.title}`, e);
       }
     }
   } catch (e) {
-    console.error('[WeRead] Fail-safe also failed:', e);
+    console.error('[WeRead] Fail-safe completely failed:', e);
   }
 
   return null;
