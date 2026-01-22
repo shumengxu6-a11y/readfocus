@@ -37,9 +37,6 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
   const [pipWindow, setPipWindow] = useState<Window | null>(null);
   const [pipSize, setPipSize] = useState({ width: 0, height: 0 }); // Track window size
 
-  // Mini Widget Mode State
-  const [isCompact, setIsCompact] = useState(false);
-
   // Define switchMode early (or use via a function that references state setter)
   // For useImperativeHandle, we simply call the internal implementation
   const handleSwitchMode = (newMode: TimerMode) => {
@@ -105,9 +102,9 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
       // Init size
       handleResize();
 
+
       pipWindow.addEventListener('unload', () => {
         setPipWindow(null);
-        setIsCompact(false); // Reset to standard on close
       });
       pipWindow.addEventListener('resize', handleResize);
 
@@ -116,19 +113,6 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
       };
     }
   }, [pipWindow]);
-
-  const toggleCompact = () => {
-    if (!pipWindow) return;
-    const newCompact = !isCompact;
-    setIsCompact(newCompact);
-
-    // Resize the PiP window based on mode
-    if (newCompact) {
-      pipWindow.resizeTo(300, 150); // Compact Size
-    } else {
-      pipWindow.resizeTo(400, 400); // Standard Size
-    }
-  };
 
   const togglePiP = async () => {
     // 1. Try Document Picture-in-Picture (Best for custom UI)
@@ -142,8 +126,8 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
 
         const dpip = window.documentPictureInPicture as any;
         const noteWindow = await dpip.requestWindow({
-          width: isCompact ? 300 : 400,
-          height: isCompact ? 150 : 400,
+          width: 400,
+          height: 400,
         });
 
         // Copy styles
@@ -288,10 +272,7 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
 
       {/* Render Portal content if PiP window exists */}
       {pipWindow && createPortal(
-        <div className={clsx(
-          "flex items-center justify-center w-full h-full text-white overflow-hidden",
-          isCompact ? "bg-black" : ""
-        )}>
+        <div className="flex items-center justify-center w-full h-full text-white overflow-hidden">
           <TimerDisplay
             mode={mode}
             timeStr={mode === 'countup' ? formatTime(countUpTime) : formatTime(timeLeft)}
@@ -299,9 +280,7 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
             totalSeconds={mode === 'custom' ? customMinutes * 60 : (mode === 'break' ? breakMinutes * 60 : 25 * 60)}
             timeLeft={timeLeft}
             isPiP={true}
-            isCompact={isCompact}
-            onToggleCompact={toggleCompact}
-            // Dynamic scale calculation: Base size 350px. 
+            // Dynamic scale calculation: Base size 350px.
             // If window is smaller, scale down. If larger, can stay 1 or scale up slightly.
             scale={Math.min(pipSize.width / 350, pipSize.height / 350, 1.2)}
           />
