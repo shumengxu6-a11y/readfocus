@@ -24,12 +24,21 @@ export default function Home() {
 
   /* ... */
 
-  const handleTimerComplete = () => {
-    setComplete(true);
-    setIsBreak(true);
-    // Start 5 min break automatically
-    if (timerRef.current) {
-      timerRef.current.startBreak(5);
+  const handleTimerComplete = (finishedMode?: string) => {
+    if (finishedMode === 'break') {
+      // Break done -> Back to Focus
+      setIsBreak(false);
+      if (timerRef.current) {
+        timerRef.current.switchMode('pomodoro');
+      }
+    } else {
+      // Focus done -> Start Break
+      setComplete(true);
+      setIsBreak(true);
+      // Start 5 min break automatically
+      if (timerRef.current) {
+        timerRef.current.startBreak(5);
+      }
     }
   };
 

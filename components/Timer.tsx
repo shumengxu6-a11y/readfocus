@@ -6,12 +6,13 @@ import { clsx } from 'clsx';
 
 export interface TimerHandle {
   startBreak: (minutes: number) => void;
+  switchMode: (mode: TimerMode) => void;
 }
 
-type TimerMode = 'pomodoro' | 'custom' | 'countup' | 'break';
+export type TimerMode = 'pomodoro' | 'custom' | 'countup' | 'break';
 
 interface TimerProps {
-  onComplete: () => void;
+  onComplete: (mode?: TimerMode) => void;
   quote?: string | null;
 }
 
@@ -21,6 +22,7 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
   const [countUpTime, setCountUpTime] = useState(0);
   const [isActive, setIsActive] = useState(false);
   const [customMinutes, setCustomMinutes] = useState(45);
+  const [breakMinutes, setBreakMinutes] = useState(5);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null); // Audio ref for completion sound
@@ -32,8 +34,12 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
   useImperativeHandle(ref, () => ({
     startBreak: (minutes: number) => {
       setMode('break');
+      setBreakMinutes(minutes); // Update state to reflect start param
       setTimeLeft(minutes * 60);
       setIsActive(true);
+    },
+    switchMode: (newMode: TimerMode) => {
+      switchMode(newMode);
     }
   }));
 
@@ -123,7 +129,8 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
 
         // 2. Draw Progress Ring
         if (mode !== 'countup') {
-          const total = mode === 'custom' ? customMinutes * 60 : (mode === 'break' ? 5 * 60 : 25 * 60);
+          // Total calculation moved later or duplicated if needed for progress
+          const total = mode === 'custom' ? customMinutes * 60 : (mode === 'break' ? breakMinutes * 60 : 25 * 60);
           const progress = timeLeft / total;
 
           const startAngle = -Math.PI / 2;
@@ -150,6 +157,9 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
           // Reset Shadow
           ctx.shadowBlur = 0;
         }
+
+        // 2.5 Calculate Total for Ring
+        const total = mode === 'custom' ? customMinutes * 60 : (mode === 'break' ? breakMinutes * 60 : 25 * 60);
 
         // 3. Draw Time Text
         ctx.fillStyle = mode === 'break' ? '#4ade80' : '#ffffff';
@@ -220,7 +230,7 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
               setIsActive(false);
               notifyComplete();
               setTimeout(() => {
-                onComplete();
+                onComplete(mode); // Pass mode to parent
               }, 0);
               return 0;
             }
@@ -244,7 +254,7 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
     setIsActive(false);
     if (mode === 'pomodoro') setTimeLeft(25 * 60);
     else if (mode === 'custom') setTimeLeft(customMinutes * 60);
-    else if (mode === 'break') setTimeLeft(5 * 60);
+    else if (mode === 'break') setTimeLeft(breakMinutes * 60);
     else if (mode === 'countup') setCountUpTime(0);
   };
 
@@ -253,7 +263,7 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
     setIsActive(false);
     if (newMode === 'pomodoro') setTimeLeft(25 * 60);
     else if (newMode === 'custom') setTimeLeft(customMinutes * 60);
-    else if (newMode === 'break') setTimeLeft(5 * 60);
+    else if (newMode === 'break') setTimeLeft(breakMinutes * 60);
     else if (newMode === 'countup') setCountUpTime(0);
   };
 
@@ -298,22 +308,26 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
 
       </div>
 
-      {/* Custom Input (Static Flow) */}
-      {mode === 'custom' && !isActive ? (
+      {/* Custom Input (Custom OR Break) */}
+      {(mode === 'custom' || mode === 'break') && !isActive ? (
         <div className="flex items-center space-x-3 bg-[#111] px-5 py-3 rounded-full border border-white/20 z-50 shadow-2xl animate-in slide-in-from-bottom-2 fade-in duration-300">
           <span className="text-xs text-gray-400 font-bold tracking-wider">MIN</span>
           <input
             type="number"
-            value={customMinutes}
+            value={mode === 'break' ? breakMinutes : customMinutes}
             onChange={(e) => {
               const val = parseInt(e.target.value) || 0;
               if (val >= 0 && val <= 999) {
-                setCustomMinutes(val);
+                if (mode === 'break') {
+                  setBreakMinutes(val);
+                } else {
+                  setCustomMinutes(val);
+                }
                 setTimeLeft(val * 60);
               }
             }}
             className="w-20 bg-transparent text-center text-2xl font-mono text-white border-b-2 border-gray-700 focus:border-blue-500 outline-none [&::-webkit-inner-spin-button]:appearance-none m-0"
-            placeholder="25"
+            placeholder={mode === 'break' ? "5" : "25"}
           />
         </div>
       ) : (
