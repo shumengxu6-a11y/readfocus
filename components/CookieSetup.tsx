@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { setUserCookie, saveSyncedData } from '@/lib/cookie-store';
+import { setUserCookie, saveSyncedData, hasSyncedData, getSyncedData } from '@/lib/cookie-store';
 import { fetchAllBookmarks } from '@/lib/weread';
 import { Settings, CheckCircle, ExternalLink, X } from 'lucide-react';
 
@@ -17,9 +17,21 @@ export function CookieSetup({ onComplete, isModal = false, onClose }: CookieSetu
     const [success, setSuccess] = useState(false);
 
     // Sync State
-    const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
-    const [syncProgress, setSyncProgress] = useState(0);
-    const [syncMessage, setSyncMessage] = useState('');
+    // Sync State
+    const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>(() => {
+        if (typeof window !== 'undefined' && hasSyncedData()) {
+            return 'success';
+        }
+        return 'idle';
+    });
+    const [syncProgress, setSyncProgress] = useState(100);
+    const [syncMessage, setSyncMessage] = useState(() => {
+        if (typeof window !== 'undefined' && hasSyncedData()) {
+            const data = getSyncedData();
+            return `已就绪 · 本地存储 ${data.length} 条笔记`;
+        }
+        return '';
+    });
 
     const handleSync = async () => {
         // Allow trying without cookie (backend might have it via Env/CookieCloud)
@@ -127,6 +139,15 @@ export function CookieSetup({ onComplete, isModal = false, onClose }: CookieSetu
                                         className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded hover:bg-blue-500/30 transition"
                                     >
                                         开始同步
+                                    </button>
+                                )}
+                                {syncStatus === 'success' && (
+                                    <button
+                                        onClick={handleSync}
+                                        className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded hover:bg-green-500/30 transition flex items-center gap-1"
+                                    >
+                                        <CheckCircle size={10} />
+                                        已同步 (点击更新)
                                     </button>
                                 )}
                             </div>
