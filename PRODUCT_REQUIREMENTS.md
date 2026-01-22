@@ -9,6 +9,7 @@
 | v2.0 | 2026-01-21 | Antigravity | Tech Refactor | 增加架构图与流程图，补充详细功能规格 |
 | v2.1 | 2026-01-21 | Antigravity | UI/UX Upgrade | 基于用户反馈，将 UI 升级为深色沉浸式设计，并对齐原型图 |
 | v2.2 | 2026-01-22 | Antigravity | Feature Update | 新增“今日专注统计”挂件；优化画中画模式（移除复杂 Mini 模式，保留自适应缩放）；修复计时统计 bug |
+| v2.3 | 2026-01-22 | Antigravity | Feature & Deploy | 新增用户手动配置 Cookie 功能，支持 Vercel 在线部署；新增在线演示地址 |
 
 ## 1. 产品概述 (Product Overview)
 
