@@ -101,15 +101,8 @@ export const fetchBookmarks = async (bookId: string): Promise<Bookmark[]> => {
 };
 
 
-const PRIORITY_TITLES = [
-  "沧浪之水",
-  "认知觉醒",
-  "学习觉醒",
-  "教父",
-  "纳瓦尔宝典",
-  "也许你该找个人聊聊",
-  "把时间当作朋友"
-];
+// Priority titles removed to favor fair randomization
+
 
 // Persistent history to avoid repetition (survives page refresh)
 const SEEN_HISTORY_KEY = 'readfocus_seen_bookmarks';
@@ -151,38 +144,32 @@ function addToSeenBookmarks(markText: string): void {
 export const getRandomBookmarkFromBooks = async (books: Book[]): Promise<Bookmark | null> => {
   if (books.length === 0) return null;
 
-  // 1. First Priority: User-specified books
-  const priorityBooks = books.filter(b => PRIORITY_TITLES.some(title => b.title.includes(title)));
-
-  // 2. Second Priority: Books with actual highlights
+  // 1. Filter Books with actual highlights
+  // Use noteCount or bookmarkCount
   const booksWithContent = books.filter(b =>
     (b.noteCount && b.noteCount > 0) || (b.bookmarkCount && b.bookmarkCount > 0)
   );
 
-  // Determine search order
-  let candidateBooks: Book[] = [];
+  // 2. Shuffle all valid books (Random Book Strategy)
+  // This ensures fair chance for all books
+  let candidateBooks = [...booksWithContent].sort(() => 0.5 - Math.random());
 
-  // Add priority books first
-  if (priorityBooks.length > 0) {
-    candidateBooks = [...candidateBooks, ...priorityBooks.sort(() => 0.5 - Math.random())];
-  }
-
-  // Add rest of books with content
-  const restWithContent = booksWithContent.filter(b => !priorityBooks.includes(b));
-  candidateBooks = [...candidateBooks, ...restWithContent.sort(() => 0.5 - Math.random())];
-
-  // Fallback
+  // Fallback if no books have explicit counts
   if (candidateBooks.length === 0) {
     candidateBooks = [...books].sort(() => 0.5 - Math.random());
   }
 
-  console.log(`[WeRead] Priority books found: ${priorityBooks.length}, Total candidates: ${candidateBooks.length}`);
+  console.log(`[WeRead] Total candidates with content: ${candidateBooks.length}`);
 
   // Get current seen history
   const seenBookmarks = getSeenBookmarks();
 
-  // Try finding a bookmark
-  const limit = Math.min(candidateBooks.length, 20);
+  // 3. Try finding a bookmark, prioritizing UNSEEN content
+  // We check up to 10 books. If a book has unseen content, we use it immediately.
+  const limit = Math.min(candidateBooks.length, 10);
+
+  // Store a backup in case we fail to find any unseen content
+  let backupBookmark: { bookmark: Bookmark, book: Book } | null = null;
 
   for (let i = 0; i < limit; i++) {
     const book = candidateBooks[i];
@@ -192,22 +179,39 @@ export const getRandomBookmarkFromBooks = async (books: Book[]): Promise<Bookmar
         // Filter out recently seen bookmarks
         const unseen = bookmarks.filter(b => !seenBookmarks.has(b.markText));
 
-        // If all seen, just pick random from all
-        const candidates = unseen.length > 0 ? unseen : bookmarks;
-        const randomBookmark = candidates[Math.floor(Math.random() * candidates.length)];
+        if (unseen.length > 0) {
+          // Found unseen content! Pick one and return immediately.
+          const randomBookmark = unseen[Math.floor(Math.random() * unseen.length)];
+          addToSeenBookmarks(randomBookmark.markText);
 
-        // Add to persistent history
-        addToSeenBookmarks(randomBookmark.markText);
+          return {
+            ...randomBookmark,
+            title: book.title,
+            author: book.author
+          };
+        }
 
-        return {
-          ...randomBookmark,
-          title: book.title,
-          author: book.author
-        };
+        // If we're here, all bookmarks in this book have been seen.
+        // Save one as backup, but continue searching other books for unseen content.
+        if (!backupBookmark) {
+          const randomSeen = bookmarks[Math.floor(Math.random() * bookmarks.length)];
+          backupBookmark = { bookmark: randomSeen, book: book };
+        }
       }
     } catch {
       console.warn(`Failed to fetch bookmarks for ${book.title}, trying next...`);
     }
+  }
+
+  // 4. Fallback: If we checked 'limit' books and found NO unseen content,
+  // return the backup (a seen bookmark) if available.
+  if (backupBookmark) {
+    console.log('[WeRead] No unseen bookmarks found in sampled books, reusing seen bookmark.');
+    return {
+      ...backupBookmark.bookmark,
+      title: backupBookmark.book.title,
+      author: backupBookmark.book.author
+    };
   }
 
   return null;
