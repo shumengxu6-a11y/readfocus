@@ -134,11 +134,11 @@ export const TimerDisplay: React.FC<TimerDisplayProps> = ({ mode, timeStr, isAct
             className="relative group z-10 select-none flex flex-col items-center justify-center transition-transform origin-center"
             style={{ transform: `scale(${scale})` }}
         >
-            {/* PiP Minimize Button */}
+            {/* PiP Minimize Button - Fixed to Window Top-Right */}
             {isPiP && (
                 <button
                     onClick={onToggleCompact}
-                    className="absolute top-[-60px] right-[-60px] p-2 text-white/30 hover:text-white transition-colors bg-white/5 hover:bg-white/10 rounded-full"
+                    className="fixed top-4 right-4 p-3 text-white/50 hover:text-white transition-colors bg-white/10 hover:bg-white/20 rounded-full z-50 backdrop-blur-sm"
                     title="Mini Widget Mode"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3" /><path d="M21 8h-3a2 2 0 0 1-2-2V3" /><path d="M3 16h3a2 2 0 0 1 2 2v3" /><path d="M16 21v-3a2 2 0 0 1 2-2h3" /></svg>
