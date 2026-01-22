@@ -105,6 +105,64 @@ export const fetchBookmarks = async (bookId: string): Promise<Bookmark[]> => {
   }
 };
 
+/**
+ * Fetch ALL bookmarks for ALL books (for Sync feature)
+ * Filters out empty books and merges all highlights.
+ */
+export const fetchAllBookmarks = async (
+  onProgress?: (count: number, total: number, message: string) => void
+): Promise<Bookmark[]> => {
+  // 1. Fetch all notebooks
+  onProgress?.(0, 0, '正在获取书架数据...');
+  const books = await fetchNotebooks();
+
+  // 2. Filter books with actual content
+  const booksWithContent = books.filter(b =>
+    (b.noteCount && b.noteCount > 0) || (b.bookmarkCount && b.bookmarkCount > 0)
+  );
+
+  const totalBooks = booksWithContent.length;
+  console.log(`[Sync] Found ${totalBooks} books with content from ${books.length} total books`);
+
+  if (totalBooks === 0) return [];
+
+  const allBookmarks: Bookmark[] = [];
+  let processedCount = 0;
+
+  // 3. Fetch bookmarks concurrently with concurrency limit
+  // Simple concurrency limit of 3
+  const CONCURRENCY = 3;
+  const chunks = [];
+
+  for (let i = 0; i < totalBooks; i += CONCURRENCY) {
+    chunks.push(booksWithContent.slice(i, i + CONCURRENCY));
+  }
+
+  for (const chunk of chunks) {
+    await Promise.all(chunk.map(async (book) => {
+      try {
+        const bookmarks = await fetchBookmarks(book.bookId);
+
+        // Enhance bookmark with book info for display
+        const enhancedCallback = bookmarks.map(b => ({
+          ...b,
+          title: book.title,
+          author: book.author
+        }));
+
+        allBookmarks.push(...enhancedCallback);
+      } catch (e) {
+        console.warn(`[Sync] Failed to fetch ${book.title}`, e);
+      } finally {
+        processedCount++;
+        onProgress?.(processedCount, totalBooks, `正在下载：${book.title}`);
+      }
+    }));
+  }
+
+  return allBookmarks;
+};
+
 
 // Priority titles removed to favor fair randomization
 

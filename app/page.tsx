@@ -8,7 +8,7 @@ import { CookieSetup } from "@/components/CookieSetup";
 import { BookOpen, Settings } from "lucide-react";
 import { clsx } from "clsx";
 import { fetchNotebooks, getRandomBookmarkFromBooks, Bookmark, Book, WereadError } from "@/lib/weread";
-import { hasUserCookie } from "@/lib/cookie-store";
+import { hasUserCookie, hasSyncedData, getSyncedData } from "@/lib/cookie-store";
 import { DailyStats } from "@/components/DailyStats";
 
 export default function Home() {
@@ -101,16 +101,26 @@ export default function Home() {
     if (isPrefetchingRef.current || nextBookmarkRef.current) return;
 
     isPrefetchingRef.current = true;
-    console.log('[App] Prefetching next bookmark...');
 
     try {
+      // 1. Prefetch from Local Sync Data
+      if (hasSyncedData()) {
+        const localBookmarks = getSyncedData();
+        if (localBookmarks.length > 0) {
+          const random = localBookmarks[Math.floor(Math.random() * localBookmarks.length)];
+          nextBookmarkRef.current = random;
+          isPrefetchingRef.current = false;
+          return;
+        }
+      }
+
+      // 2. Fallback Prefetch from API
       if (booksRef.current.length === 0) {
         booksRef.current = await fetchNotebooks();
       }
       const newBookmark = await getRandomBookmarkFromBooks(booksRef.current);
       if (newBookmark) {
         nextBookmarkRef.current = newBookmark;
-        console.log('[App] Bookmark prefetched ready.');
       }
     } catch (e) {
       console.warn('[App] Prefetch failed:', e);
@@ -120,34 +130,49 @@ export default function Home() {
   };
 
   const loadNewBookmark = async () => {
-    setLoading(true);
-    setError(null);
-
-    // If we have a prefetched bookmark, use it immediately
+    // 1. Use preloaded if available
     if (nextBookmarkRef.current) {
       setBookmark(nextBookmarkRef.current);
-      nextBookmarkRef.current = null; // Clear used
-      setLoading(false);
-      prefetchBookmark(); // Queue next one
+      nextBookmarkRef.current = null;
+      // Fetch next one in background
+      prefetchBookmark();
       return;
     }
 
-    // Otherwise fetch normally
+    setLoading(true);
+    setError(null);
     try {
+      // 2. CHECK LOCAL SYNC DATA FIRST (Zero Latency)
+      if (hasSyncedData()) {
+        const localBookmarks = getSyncedData();
+        if (localBookmarks.length > 0) {
+          console.log('[Mode] Using Local Synced Data');
+          const random = localBookmarks[Math.floor(Math.random() * localBookmarks.length)];
+          setBookmark(random);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // 3. Fallback to API Fetch
+      console.log('[Mode] Using API Fetch');
       if (booksRef.current.length === 0) {
         booksRef.current = await fetchNotebooks();
       }
-      const newBookmark = await getRandomBookmarkFromBooks(booksRef.current);
-      setBookmark(newBookmark);
 
-      // Trigger prefetch for the *next* time
-      prefetchBookmark();
-    } catch (e: any) {
-      console.error(e);
-      if (e.name === 'WereadError' || e.code === 'SESSION_EXPIRED' || e.response?.status === 401) {
-        setError(e);
+      const newBookmark = await getRandomBookmarkFromBooks(booksRef.current);
+
+      if (newBookmark) {
+        setBookmark(newBookmark);
       } else {
-        setError(new WereadError('Failed to fetch content. Please try again.'));
+        setError(new WereadError("No highlights found", "NO_CONTENT", "Try adding some highlights in WeRead first"));
+      }
+    } catch (err: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
+      console.error(err);
+      if (err.name === 'WereadError' || err.code === 'SESSION_EXPIRED' || err.response?.status === 401) {
+        setError(err);
+      } else {
+        setError(new WereadError(err.message));
       }
     } finally {
       setLoading(false);

@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { setUserCookie } from '@/lib/cookie-store';
+import { setUserCookie, saveSyncedData } from '@/lib/cookie-store';
+import { fetchAllBookmarks } from '@/lib/weread';
 import { Settings, CheckCircle, ExternalLink, X } from 'lucide-react';
 
 interface CookieSetupProps {
@@ -15,21 +16,64 @@ export function CookieSetup({ onComplete, isModal = false, onClose }: CookieSetu
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
 
+    // Sync State
+    const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
+    const [syncProgress, setSyncProgress] = useState(0);
+    const [syncMessage, setSyncMessage] = useState('');
+
+    const handleSync = async () => {
+        if (!cookie) {
+            setError('请先粘贴 Cookie');
+            return;
+        }
+
+        // Save cookie first
+        setUserCookie(cookie);
+
+        setSyncStatus('syncing');
+        setSyncProgress(0);
+        setSyncMessage('正在初始化...');
+
+        try {
+            const bookmarks = await fetchAllBookmarks((current, total, msg) => {
+                const progress = total > 0 ? Math.round((current / total) * 100) : 0;
+                setSyncProgress(progress);
+                setSyncMessage(msg);
+            });
+
+            saveSyncedData(bookmarks);
+            setSyncStatus('success');
+            setSyncMessage(`同步成功！共获取 ${bookmarks.length} 条划线笔记`);
+
+            // Auto complete after sync
+            setTimeout(() => {
+                setSuccess(true);
+                setTimeout(onComplete, 1000);
+            }, 1000);
+
+        } catch (e) {
+            console.error('Sync failed', e);
+            setSyncStatus('error');
+            setSyncMessage('同步失败，请检查 Cookie 是否有效');
+            setError('同步失败，请重试');
+        }
+    };
+
     const handleSave = () => {
         const trimmed = cookie.trim();
-
         if (!trimmed) {
             setError('请输入 Cookie');
             return;
         }
-
-        // Basic validation: should contain wr_vid or wr_skey
+        // Basic validation
         if (!trimmed.includes('wr_vid') && !trimmed.includes('wr_skey')) {
             setError('Cookie 格式不正确，请确保包含 wr_vid 或 wr_skey');
             return;
         }
 
         setUserCookie(trimmed);
+
+        // If not synced, just save cookie and exit
         setSuccess(true);
         setError('');
 
@@ -69,6 +113,41 @@ export function CookieSetup({ onComplete, isModal = false, onClose }: CookieSetu
                     </div>
                 ) : (
                     <>
+                        {/* New Sync Section */}
+                        {cookie && (
+                            <div className="mb-6 bg-white/5 p-4 rounded-xl border border-white/10">
+                                <div className="flex items-center justify-between mb-2">
+                                    <h3 className="text-white font-medium">全量数据同步</h3>
+                                    {syncStatus === 'idle' && (
+                                        <button
+                                            onClick={handleSync}
+                                            className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded hover:bg-blue-500/30 transition"
+                                        >
+                                            开始同步
+                                        </button>
+                                    )}
+                                </div>
+                                <p className="text-xs text-white/50 mb-3">
+                                    一次性下载所有划线到本地，实现秒开体验。
+                                </p>
+
+                                {syncStatus !== 'idle' && (
+                                    <div className="space-y-2">
+                                        <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                                            <div
+                                                className="h-full bg-blue-500 transition-all duration-300"
+                                                style={{ width: `${syncProgress}%` }}
+                                            />
+                                        </div>
+                                        <div className="flex justify-between text-xs text-white/60">
+                                            <span>{syncMessage}</span>
+                                            <span>{syncProgress}%</span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         <div className="mb-4">
                             <label className="block text-sm text-white/70 mb-2">
                                 微信读书 Cookie
@@ -98,12 +177,32 @@ export function CookieSetup({ onComplete, isModal = false, onClose }: CookieSetu
                             </ol>
                         </div>
 
-                        <button
-                            onClick={handleSave}
-                            className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-medium rounded-xl transition-all duration-300 transform hover:scale-[1.02]"
-                        >
-                            保存并开始使用
-                        </button>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={handleSave}
+                                disabled={syncStatus === 'syncing'}
+                                className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-medium rounded-xl transition-all duration-300 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {syncStatus === 'success' ? '同步完成，进入阅读' : '保存 Cookie'}
+                            </button>
+
+                            {/* Clear Data Button (Only showed in modal mode) */}
+                            {isModal && (
+                                <button
+                                    onClick={() => {
+                                        if (confirm('确定要清除本地所有缓存数据吗？')) {
+                                            localStorage.removeItem('readfocus_all_data');
+                                            localStorage.removeItem('weread_user_cookie');
+                                            alert('已清除，请刷新页面');
+                                            window.location.reload();
+                                        }
+                                    }}
+                                    className="px-4 py-3 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-xl transition"
+                                >
+                                    清除数据
+                                </button>
+                            )}
+                        </div>
 
                         <p className="text-xs text-white/30 text-center mt-4">
                             Cookie 仅保存在你的浏览器本地，不会上传到任何服务器
