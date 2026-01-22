@@ -217,11 +217,31 @@ export const getRandomBookmarkFromBooks = async (books: Book[]): Promise<Bookmar
   // Calculate score = (noteCount + bookmarkCount) * Math.random()
   // This ensures books with more notes have a much higher chance of being picked early.
 
-  const candidateBooks = booksWithContent.map(b => ({
-    book: b,
-    weight: (b.noteCount || 0) + (b.bookmarkCount || 0) + 1,
-    random: Math.random()
-  }))
+  // Specific books user wants to see first
+  const PRIORITY_TITLES = [
+    '沧浪之水',
+    '教父',
+    '认知觉醒',
+    '也许你该找个人谈谈',
+    '腰背维修师',
+    '学习觉醒'
+  ];
+
+  const candidateBooks = booksWithContent.map(b => {
+    let weight = (b.noteCount || 0) + (b.bookmarkCount || 0) + 1;
+
+    // Boost weight for priority books (e.g. 100x multiplier)
+    if (PRIORITY_TITLES.some(t => b.title.includes(t))) {
+      weight *= 100;
+      console.log(`[WeRead] Boosting priority book: ${b.title}`);
+    }
+
+    return {
+      book: b,
+      weight: weight,
+      random: Math.random()
+    };
+  })
     .map(item => ({
       ...item,
       score: item.weight * item.random
