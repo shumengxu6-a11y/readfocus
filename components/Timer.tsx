@@ -45,29 +45,6 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
     }
   }));
 
-
-
-  // Helper to wrap text for canvas
-  const wrapText = (ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, lineHeight: number) => {
-    const words = text.split(''); // Split by char for Chinese support
-    let line = '';
-    let currentY = y;
-
-    for (let n = 0; n < words.length; n++) {
-      const testLine = line + words[n];
-      const metrics = ctx.measureText(testLine);
-      const testWidth = metrics.width;
-      if (testWidth > maxWidth && n > 0) {
-        ctx.fillText(line, x, currentY);
-        line = words[n];
-        currentY += lineHeight;
-      } else {
-        line = testLine;
-      }
-    }
-    ctx.fillText(line, x, currentY);
-  };
-
   // Request notification permission on mount
   useEffect(() => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
@@ -85,113 +62,20 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // PiP: Draw timer OR Quote to canvas
+  // Sync TimerDisplay canvas with Video PiP Stream
   useEffect(() => {
     const canvas = canvasRef.current;
     const video = videoRef.current;
 
     if (!canvas || !video) return;
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Set canvas size for high resolution (Retina/High DPI)
-    canvas.width = 1200;
-    canvas.height = 800;
-
-    const draw = () => {
-      // Clear background
-      ctx.fillStyle = '#0a0a0a'; // Dark background
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      if (quote) {
-        // --- DRAW QUOTE MODE ---
-        ctx.fillStyle = '#ededed';
-        ctx.font = 'bold 48px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-
-        wrapText(ctx, quote, canvas.width / 2, 150, 1000, 64);
-
-        ctx.font = '32px sans-serif';
-        ctx.fillStyle = '#888888';
-        ctx.fillText("回到页面开始专注", canvas.width / 2, canvas.height - 50);
-
-      } else {
-        // --- DRAW TIMER MODE ---
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2;
-        const radius = 250;
-        const lineWidth = 20;
-
-        // 1. Draw Background Ring
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-        ctx.lineWidth = lineWidth;
-        ctx.strokeStyle = '#222222';
-        ctx.stroke();
-
-        // 2. Draw Progress Ring
-        if (mode !== 'countup') {
-          // Total calculation moved later or duplicated if needed for progress
-          const total = mode === 'custom' ? customMinutes * 60 : (mode === 'break' ? breakMinutes * 60 : 25 * 60);
-          const progress = timeLeft / total;
-
-          const startAngle = -Math.PI / 2;
-          const endAngle = startAngle + (2 * Math.PI * progress);
-
-          ctx.beginPath();
-          ctx.arc(centerX, centerY, radius, startAngle, endAngle);
-          ctx.lineWidth = lineWidth;
-          ctx.strokeStyle = isActive
-            ? (mode === 'break' ? '#22c55e' : '#3b82f6')
-            : '#555555';
-          ctx.lineCap = 'round';
-
-          // Add Glow Effect
-          if (isActive) {
-            ctx.shadowBlur = 30;
-            ctx.shadowColor = mode === 'break' ? '#22c55e' : '#3b82f6';
-          } else {
-            ctx.shadowBlur = 0;
-          }
-
-          ctx.stroke();
-
-          // Reset Shadow
-          ctx.shadowBlur = 0;
-        }
-
-        // 2.5 Calculate Total for Ring
-        const total = mode === 'custom' ? customMinutes * 60 : (mode === 'break' ? breakMinutes * 60 : 25 * 60);
-
-        // 3. Draw Time Text
-        ctx.fillStyle = mode === 'break' ? '#4ade80' : '#ffffff';
-        ctx.font = 'bold 180px monospace';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-
-        const timeStr = mode === 'countup' ? formatTime(countUpTime) : formatTime(timeLeft);
-        ctx.fillText(timeStr, centerX, centerY + 20);
-
-        // 4. Draw Status Text
-        ctx.font = '30px sans-serif';
-        ctx.fillStyle = isActive
-          ? (mode === 'break' ? '#22c55e' : '#3b82f6')
-          : '#666666';
-        ctx.fillText(isActive ? (mode === 'break' ? "R E S T I N G" : "F O C U S I N G") : "PAUSED", centerX, centerY + 140);
-      }
-    };
-
-    draw();
-
+    // Ensure video plays the canvas stream
     if (video.srcObject === null) {
       const stream = canvas.captureStream(30);
       video.srcObject = stream;
       video.play().catch(() => { });
     }
-
-  }, [timeLeft, countUpTime, mode, isActive, customMinutes, quote]);
+  }, []); // Run once on mount to setup stream connection (Canvas updates are handled by TimerDisplay)
 
   // Document PiP State
   const [pipWindow, setPipWindow] = useState<Window | null>(null);
