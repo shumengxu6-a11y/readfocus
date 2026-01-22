@@ -315,28 +315,43 @@ export const getRandomBookmarkFromBooks = async (books: Book[]): Promise<Bookmar
     };
   }
 
-  // 5. Fallback B (Fail-Safe): If we checked 30 books and found NOTHING (all empty/failed),
-  // pick the Top 5 books with the MOST notes and try them one by one.
-  // This prevents "No highlights found" error when valid content exists but wasn't sampled.
+  // 5. Fallback B (Fail-Safe): 
+  // If random sampling failed (e.g. checked 30 books and all were empty/filtered),
+  // we need to be smarter about which books to force check.
   try {
-    const topBooks = [...booksWithContent].sort((a, b) =>
-      ((b.noteCount || 0) + (b.bookmarkCount || 0)) - ((a.noteCount || 0) + (a.bookmarkCount || 0))
-    ).slice(0, 5); // Try top 5 largest
+    // Strategy 1: Check Priority Books First (User guaranteed these)
+    const PRIORITY_TITLES = [
+      '沧浪之水', '教父', '认知觉醒', '也许你该找个人谈谈', '腰背维修师', '学习觉醒'
+    ];
 
-    for (const bookWithMostNotes of topBooks) {
-      console.log(`[WeRead] Fail-safe: Trying large book: ${bookWithMostNotes.title}`);
+    const priorityBooks = booksWithContent.filter(b =>
+      PRIORITY_TITLES.some(t => b.title.includes(t))
+    );
+
+    // Strategy 2: Check Largest Books (Most likely to have data)
+    const topLargestBooks = [...booksWithContent].sort((a, b) =>
+      ((b.noteCount || 0) + (b.bookmarkCount || 0)) - ((a.noteCount || 0) + (a.bookmarkCount || 0))
+    ).slice(0, 5);
+
+    // Combine strategies: Priority first, then largest. Unique them.
+    const failSafeCandidates = Array.from(new Set([...priorityBooks, ...topLargestBooks]));
+
+    for (const book of failSafeCandidates) {
+      console.log(`[WeRead] Fail-safe: Trying book: ${book.title}`);
       try {
-        const bookmarks = await fetchBookmarks(bookWithMostNotes.bookId);
+        const bookmarks = await fetchBookmarks(book.bookId);
         if (bookmarks.length > 0) {
           const randomBookmark = bookmarks[Math.floor(Math.random() * bookmarks.length)];
           return {
             ...randomBookmark,
-            title: bookWithMostNotes.title,
-            author: bookWithMostNotes.author
+            title: book.title,
+            author: book.author
           };
+        } else {
+          console.warn(`[WeRead] Fail-safe: Book ${book.title} ended up empty (strict filter).`);
         }
       } catch (e) {
-        console.warn(`[WeRead] Fail-safe failed for ${bookWithMostNotes.title}`, e);
+        console.warn(`[WeRead] Fail-safe failed for ${book.title}`, e);
       }
     }
   } catch (e) {
