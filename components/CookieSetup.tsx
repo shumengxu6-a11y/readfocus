@@ -113,40 +113,38 @@ export function CookieSetup({ onComplete, isModal = false, onClose }: CookieSetu
                     </div>
                 ) : (
                     <>
-                        {/* New Sync Section */}
-                        {cookie && (
-                            <div className="mb-6 bg-white/5 p-4 rounded-xl border border-white/10">
-                                <div className="flex items-center justify-between mb-2">
-                                    <h3 className="text-white font-medium">全量数据同步</h3>
-                                    {syncStatus === 'idle' && (
-                                        <button
-                                            onClick={handleSync}
-                                            className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded hover:bg-blue-500/30 transition"
-                                        >
-                                            开始同步
-                                        </button>
-                                    )}
-                                </div>
-                                <p className="text-xs text-white/50 mb-3">
-                                    一次性下载所有划线到本地，实现秒开体验。
-                                </p>
-
-                                {syncStatus !== 'idle' && (
-                                    <div className="space-y-2">
-                                        <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                                            <div
-                                                className="h-full bg-blue-500 transition-all duration-300"
-                                                style={{ width: `${syncProgress}%` }}
-                                            />
-                                        </div>
-                                        <div className="flex justify-between text-xs text-white/60">
-                                            <span>{syncMessage}</span>
-                                            <span>{syncProgress}%</span>
-                                        </div>
-                                    </div>
+                        {/* Sync Section - Always Show */}
+                        <div className="mb-6 bg-white/5 p-4 rounded-xl border border-white/10">
+                            <div className="flex items-center justify-between mb-2">
+                                <h3 className="text-white font-medium">全量数据同步</h3>
+                                {syncStatus === 'idle' && (
+                                    <button
+                                        onClick={handleSync}
+                                        className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded hover:bg-blue-500/30 transition"
+                                    >
+                                        开始同步
+                                    </button>
                                 )}
                             </div>
-                        )}
+                            <p className="text-xs text-white/50 mb-3">
+                                一次性下载所有划线到本地，实现秒开体验。
+                            </p>
+
+                            {syncStatus !== 'idle' && (
+                                <div className="space-y-2">
+                                    <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-blue-500 transition-all duration-300"
+                                            style={{ width: `${syncProgress}%` }}
+                                        />
+                                    </div>
+                                    <div className="flex justify-between text-xs text-white/60">
+                                        <span>{syncMessage}</span>
+                                        <span>{syncProgress}%</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
 
                         <div className="mb-4">
                             <label className="block text-sm text-white/70 mb-2">
