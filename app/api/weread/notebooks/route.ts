@@ -1,17 +1,24 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getWereadCookieFromCloud } from '@/lib/cookiecloud';
 import { WeReadApi } from '@/lib/weread-api';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
-  let cookie = process.env.WEREAD_COOKIE;
+export async function GET(request: NextRequest) {
+  // Priority 1: Cookie from client (user's browser localStorage)
+  let cookie = request.headers.get('X-Weread-Cookie');
 
-  if (process.env.COOKIECLOUD_HOST && process.env.COOKIECLOUD_UUID) {
+  // Priority 2: CookieCloud (for local dev)
+  if (!cookie && process.env.COOKIECLOUD_HOST && process.env.COOKIECLOUD_UUID) {
     const cloudCookie = await getWereadCookieFromCloud();
     if (cloudCookie) {
       cookie = cloudCookie;
     }
+  }
+
+  // Priority 3: Environment variable
+  if (!cookie) {
+    cookie = process.env.WEREAD_COOKIE || null;
   }
 
   if (!cookie) {

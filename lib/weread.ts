@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getUserCookie } from './cookie-store';
 
 export interface Book {
   bookId: string;
@@ -38,9 +39,17 @@ export class WereadError extends Error {
   }
 }
 
+// Helper to get headers with cookie
+const getHeaders = () => {
+  const cookie = getUserCookie();
+  return cookie ? { 'X-Weread-Cookie': cookie } : {};
+};
+
 export const fetchNotebooks = async (): Promise<Book[]> => {
   try {
-    const response = await axios.get<WereadNotebooksResponse>('/api/weread/notebooks');
+    const response = await axios.get<WereadNotebooksResponse>('/api/weread/notebooks', {
+      headers: getHeaders()
+    });
 
     if (response.data && Array.isArray(response.data.books)) {
       // Map the nested book structure to the flat Book interface
@@ -71,7 +80,9 @@ export const fetchNotebooks = async (): Promise<Book[]> => {
 
 export const fetchBookmarks = async (bookId: string): Promise<Bookmark[]> => {
   try {
-    const response = await axios.get<WereadBookmarksResponse>(`/api/weread/bookmarks?bookId=${bookId}`);
+    const response = await axios.get<WereadBookmarksResponse>(`/api/weread/bookmarks?bookId=${bookId}`, {
+      headers: getHeaders()
+    });
     if (response.data && Array.isArray(response.data.updated)) {
       return response.data.updated;
     }

@@ -4,9 +4,11 @@ import { useState, useEffect, useRef } from "react";
 
 import { Timer, TimerHandle } from "@/components/Timer";
 import { ReadingCard } from "@/components/ReadingCard";
-import { BookOpen } from "lucide-react";
+import { CookieSetup } from "@/components/CookieSetup";
+import { BookOpen, Settings } from "lucide-react";
 import { clsx } from "clsx";
 import { fetchNotebooks, getRandomBookmarkFromBooks, Bookmark, Book, WereadError } from "@/lib/weread";
+import { hasUserCookie } from "@/lib/cookie-store";
 import { DailyStats } from "@/components/DailyStats";
 
 export default function Home() {
@@ -16,6 +18,10 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<WereadError | null>(null);
 
+  // Cookie setup state
+  const [needsSetup, setNeedsSetup] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
+
   const timerRef = useRef<TimerHandle>(null);
 
   // Cache for books and preloaded bookmark
@@ -23,7 +29,10 @@ export default function Home() {
   const nextBookmarkRef = useRef<Bookmark | null>(null);
   const isPrefetchingRef = useRef(false);
 
-  /* ... */
+  // Check cookie on mount
+  useEffect(() => {
+    setNeedsSetup(!hasUserCookie());
+  }, []);
 
   // Prevent double-firing of completion logic
   const lastCompleteTimeRef = useRef(0);
@@ -137,15 +146,42 @@ export default function Home() {
   return (
     <div className="min-h-screen relative flex items-center justify-center overflow-hidden">
 
+      {/* Cookie Setup Screen */}
+      {needsSetup && (
+        <CookieSetup onComplete={() => setNeedsSetup(false)} />
+      )}
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <CookieSetup
+          isModal
+          onComplete={() => setShowSettings(false)}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
+
       {/* Background Gradient */}
       <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-[#0a0a0a] to-[#111] z-0"></div>
       <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] bg-blue-900/10 rounded-full blur-[120px] pointer-events-none"></div>
 
-      <header className="absolute top-0 left-0 p-8 flex items-center space-x-3 z-20">
-        <div className="bg-white/10 p-2 rounded-lg backdrop-blur-sm border border-white/5">
-          <BookOpen size={20} className="text-blue-400" />
+      <header className="absolute top-0 left-0 right-0 p-8 flex items-center justify-between z-20">
+        <div className="flex items-center space-x-3">
+          <div className="bg-white/10 p-2 rounded-lg backdrop-blur-sm border border-white/5">
+            <BookOpen size={20} className="text-blue-400" />
+          </div>
+          <span className="font-bold text-lg tracking-wider text-white/80">ReadFocus</span>
         </div>
-        <span className="font-bold text-lg tracking-wider text-white/80">ReadFocus</span>
+
+        {/* Settings Button */}
+        {!needsSetup && (
+          <button
+            onClick={() => setShowSettings(true)}
+            className="bg-white/5 hover:bg-white/10 p-2 rounded-lg backdrop-blur-sm border border-white/5 transition-colors"
+            title="设置 Cookie"
+          >
+            <Settings size={18} className="text-white/60" />
+          </button>
+        )}
       </header>
 
       <main className="relative z-10 w-full max-w-7xl px-8 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center min-h-[600px]">
