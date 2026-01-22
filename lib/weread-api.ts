@@ -198,12 +198,8 @@ export class WeReadApi {
 
         let combined: WeReadBookmark[] = [...bookmarks, ...reviews];
 
-        // Fallback: If no personal data found, try fetching 'Best Bookmarks' (popular highlights)
-        if (combined.length === 0) {
-            console.log(`[WeReadApi] No personal notes found for ${bookId}. Trying best bookmarks...`);
-            const best = await this.fetchBestBookmarks(bookId);
-            combined = best;
-        }
+        // REMOVED Fallback: User strictly wants THEIR OWN highlights.
+        // If no personal data found, return empty. Do NOT fetch 'Best Bookmarks'.
 
         // Deduplicate
         const uniqueMap = new Map<string, WeReadBookmark>();
