@@ -213,9 +213,21 @@ export const getRandomBookmarkFromBooks = async (books: Book[]): Promise<Bookmar
     (b.noteCount && b.noteCount > 0) || (b.bookmarkCount && b.bookmarkCount > 0)
   );
 
-  // 2. Shuffle all valid books (Random Book Strategy)
-  // This ensures fair chance for all books
-  let candidateBooks = [...booksWithContent].sort(() => 0.5 - Math.random());
+  // 2. Weighted Random Selection (Prioritize books with more notes)
+  // Calculate score = (noteCount + bookmarkCount) * Math.random()
+  // This ensures books with more notes have a much higher chance of being picked early.
+
+  const candidateBooks = booksWithContent.map(b => ({
+    book: b,
+    weight: (b.noteCount || 0) + (b.bookmarkCount || 0) + 1,
+    random: Math.random()
+  }))
+    .map(item => ({
+      ...item,
+      score: item.weight * item.random
+    }))
+    .sort((a, b) => b.score - a.score) // Sort descending by weighted score
+    .map(item => item.book);
 
   // Strict Mode: Do NOT fallback to all books. 
   // If we have no books with counts, it means we really have no content (or API failed differently).
