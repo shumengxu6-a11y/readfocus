@@ -111,8 +111,42 @@ const PRIORITY_TITLES = [
   "把时间当作朋友"
 ];
 
-// Simple in-memory history to avoid immediate repetition
-const seenBookmarks = new Set<string>();
+// Persistent history to avoid repetition (survives page refresh)
+const SEEN_HISTORY_KEY = 'readfocus_seen_bookmarks';
+const MAX_HISTORY_SIZE = 200;
+
+function getSeenBookmarks(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const stored = localStorage.getItem(SEEN_HISTORY_KEY);
+    if (stored) {
+      return new Set(JSON.parse(stored));
+    }
+  } catch (e) {
+    console.warn('[History] Failed to load seen history:', e);
+  }
+  return new Set();
+}
+
+function addToSeenBookmarks(markText: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const seen = getSeenBookmarks();
+    seen.add(markText);
+
+    // Keep history size manageable
+    if (seen.size > MAX_HISTORY_SIZE) {
+      const arr = Array.from(seen);
+      // Remove oldest entries (first ones in array)
+      const trimmed = arr.slice(arr.length - MAX_HISTORY_SIZE);
+      localStorage.setItem(SEEN_HISTORY_KEY, JSON.stringify(trimmed));
+    } else {
+      localStorage.setItem(SEEN_HISTORY_KEY, JSON.stringify(Array.from(seen)));
+    }
+  } catch (e) {
+    console.warn('[History] Failed to save seen history:', e);
+  }
+}
 
 export const getRandomBookmarkFromBooks = async (books: Book[]): Promise<Bookmark | null> => {
   if (books.length === 0) return null;
@@ -144,6 +178,9 @@ export const getRandomBookmarkFromBooks = async (books: Book[]): Promise<Bookmar
 
   console.log(`[WeRead] Priority books found: ${priorityBooks.length}, Total candidates: ${candidateBooks.length}`);
 
+  // Get current seen history
+  const seenBookmarks = getSeenBookmarks();
+
   // Try finding a bookmark
   const limit = Math.min(candidateBooks.length, 20);
 
@@ -159,15 +196,8 @@ export const getRandomBookmarkFromBooks = async (books: Book[]): Promise<Bookmar
         const candidates = unseen.length > 0 ? unseen : bookmarks;
         const randomBookmark = candidates[Math.floor(Math.random() * candidates.length)];
 
-        // Add to history
-        seenBookmarks.add(randomBookmark.markText);
-        if (seenBookmarks.size > 50) {
-          // Keep history size manageable
-          const firstValue = seenBookmarks.values().next().value;
-          if (firstValue) {
-            seenBookmarks.delete(firstValue);
-          }
-        }
+        // Add to persistent history
+        addToSeenBookmarks(randomBookmark.markText);
 
         return {
           ...randomBookmark,
