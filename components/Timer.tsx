@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
+import { createPortal } from 'react-dom';
+import { TimerDisplay } from './timer/TimerDisplay';
 import { Play, Pause, RotateCcw, Coffee, PictureInPicture } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -42,6 +44,8 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
       switchMode(newMode);
     }
   }));
+
+
 
   // Helper to wrap text for canvas
   const wrapText = (ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, lineHeight: number) => {
@@ -189,7 +193,67 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
 
   }, [timeLeft, countUpTime, mode, isActive, customMinutes, quote]);
 
+  // Document PiP State
+  const [pipWindow, setPipWindow] = useState<Window | null>(null);
+
+  // Close PiP window cleanup
+  useEffect(() => {
+    if (pipWindow) {
+      pipWindow.addEventListener('unload', () => {
+        setPipWindow(null);
+      });
+    }
+  }, [pipWindow]);
+
+
   const togglePiP = async () => {
+    // 1. Try Document Picture-in-Picture (Best for custom UI)
+    if ('documentPictureInPicture' in window) {
+      try {
+        if (pipWindow) {
+          pipWindow.close();
+          setPipWindow(null);
+          return;
+        }
+
+        const dpip = window.documentPictureInPicture as any;
+        const noteWindow = await dpip.requestWindow({
+          width: 400,
+          height: 300,
+        });
+
+        // Copy styles
+        [...document.styleSheets].forEach((styleSheet) => {
+          try {
+            const cssRules = [...styleSheet.cssRules].map((rule) => rule.cssText).join('');
+            const style = document.createElement('style');
+            style.textContent = cssRules;
+            noteWindow.document.head.appendChild(style);
+          } catch (e) {
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.type = 'text/css';
+            link.href = styleSheet.href || '';
+            noteWindow.document.head.appendChild(link);
+          }
+        });
+
+        // Add dark background to body
+        noteWindow.document.body.style.backgroundColor = '#111';
+        noteWindow.document.body.style.display = 'flex';
+        noteWindow.document.body.style.justifyContent = 'center';
+        noteWindow.document.body.style.alignItems = 'center';
+        noteWindow.document.body.style.margin = '0';
+
+        setPipWindow(noteWindow);
+        return;
+
+      } catch (e) {
+        console.error('Document PiP failed, falling back to Video PiP', e);
+      }
+    }
+
+    // 2. Fallback to Video Picture-in-Picture (Standard)
     if (!videoRef.current) return;
 
     try {
@@ -271,7 +335,8 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
     <div className="flex flex-col items-center justify-center p-8 space-y-10 w-full max-w-lg mx-auto transform transition-all">
 
       {/* Hidden Canvas & Video for PiP */}
-      <canvas ref={canvasRef} width={300} height={150} className="hidden" />
+      {/* Hidden Canvas & Video for Video PiP Fallback */}
+      {/* TimerDisplay will attach to this canvasRef if visible locally, or we handle it manually if not */}
       <video ref={videoRef} className="hidden" muted playsInline />
 
       {/* Mode Switcher */}
@@ -293,20 +358,37 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
       </div>
 
       {/* Main Timer Display */}
-      <div className="relative group z-10">
-        {/* Decorative Rings */}
-        <div className={clsx(
-          "absolute -inset-4 rounded-full border-2 w-[300px] h-[300px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 transition-all duration-1000 pointer-events-none",
-          mode === 'break' ? "border-green-500/20" : "border-blue-500/20",
-          isActive ? "scale-110 opacity-100 animate-pulse" : "scale-100 opacity-0"
-        )}></div>
-
-        <div className="text-9xl font-bold font-mono tracking-tighter text-white drop-shadow-2xl relative z-10 w-[320px] text-center">
-          {mode === 'countup' ? formatTime(countUpTime) : formatTime(timeLeft)}
+      {/* Main Timer Display - Rendered inline or in Portal */}
+      {pipWindow ? (
+        // Render 100% nothing here if we moved it to PiP? 
+        // Or keep a placeholder? Let's keep a placeholder or user might get confused.
+        <div className="relative group z-10 w-[300px] h-[300px] flex items-center justify-center border-2 border-white/5 rounded-full">
+          <span className="text-white/30 text-sm">Timer in Window</span>
         </div>
+      ) : (
+        <TimerDisplay
+          mode={mode}
+          timeStr={mode === 'countup' ? formatTime(countUpTime) : formatTime(timeLeft)}
+          isActive={isActive}
+          totalSeconds={mode === 'custom' ? customMinutes * 60 : (mode === 'break' ? breakMinutes * 60 : 25 * 60)}
+          timeLeft={timeLeft}
+          canvasRef={canvasRef} // For video fallback
+        />
+      )}
 
-
-      </div>
+      {/* Render Portal content if PiP window exists */}
+      {pipWindow && createPortal(
+        <div className="flex items-center justify-center w-full h-full scale-75">
+          <TimerDisplay
+            mode={mode}
+            timeStr={mode === 'countup' ? formatTime(countUpTime) : formatTime(timeLeft)}
+            isActive={isActive}
+            totalSeconds={mode === 'custom' ? customMinutes * 60 : (mode === 'break' ? breakMinutes * 60 : 25 * 60)}
+            timeLeft={timeLeft}
+          />
+        </div>,
+        pipWindow.document.body
+      )}
 
       {/* Custom Input (Custom OR Break) */}
       {(mode === 'custom' || mode === 'break') && !isActive ? (
