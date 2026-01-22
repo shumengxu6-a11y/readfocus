@@ -25,7 +25,15 @@ export default function Home() {
 
   /* ... */
 
+  // Prevent double-firing of completion logic
+  const lastCompleteTimeRef = useRef(0);
+
   const handleTimerComplete = (finishedMode: string, durationSeconds: number) => {
+    // Debounce: If completed within last 2 seconds, ignore
+    const now = Date.now();
+    if (now - lastCompleteTimeRef.current < 2000) return;
+    lastCompleteTimeRef.current = now;
+
     if (finishedMode === 'break') {
       // Break done -> Back to Focus
       setIsBreak(false);
@@ -42,9 +50,11 @@ export default function Home() {
       }
 
       // Dispatch Focus Event for Stats
-      // Use actual duration from Timer
-      const minutes = Math.max(0, Math.round(durationSeconds / 60));
+      // Use actual duration from Timer. Use floor to be conservative (e.g. 1m59s = 1m).
+      // Minimum 1 minute to count? Or 0 is fine? Let's allow > 0.
+      const minutes = Math.floor(durationSeconds / 60);
       if (minutes > 0) {
+        console.log(`[App] Focus Complete: ${minutes} minutes (from ${durationSeconds}s)`);
         window.dispatchEvent(new CustomEvent('focus-completed', { detail: { minutes } }));
       }
     }
