@@ -39,7 +39,7 @@ export function CookieSetup({ onComplete, isModal = false, onClose }: CookieSetu
     };
 
     return (
-        <div className={`${isModal ? 'fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4' : 'min-h-screen flex items-center justify-center'}`}>
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
             <div className="glass-panel w-full max-w-lg p-8 rounded-3xl border border-white/10 relative">
 
                 {isModal && onClose && (
