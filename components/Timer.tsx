@@ -35,6 +35,7 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
 
   // Document PiP State
   const [pipWindow, setPipWindow] = useState<Window | null>(null);
+  const [pipSize, setPipSize] = useState({ width: 0, height: 0 }); // Track window size
 
   // Mini Widget Mode State
   const [isCompact, setIsCompact] = useState(false);
@@ -94,13 +95,25 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
     }
   }, []); // Run once on mount to setup stream connection
 
-  // Close PiP window cleanup
+  // Close PiP window cleanup & Resize Listener
   useEffect(() => {
     if (pipWindow) {
+      const handleResize = () => {
+        setPipSize({ width: pipWindow.innerWidth, height: pipWindow.innerHeight });
+      };
+
+      // Init size
+      handleResize();
+
       pipWindow.addEventListener('unload', () => {
         setPipWindow(null);
         setIsCompact(false); // Reset to standard on close
       });
+      pipWindow.addEventListener('resize', handleResize);
+
+      return () => {
+        pipWindow.removeEventListener('resize', handleResize);
+      };
     }
   }, [pipWindow]);
 
@@ -288,7 +301,9 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
             isPiP={true}
             isCompact={isCompact}
             onToggleCompact={toggleCompact}
-            scale={isCompact ? 0.6 : 0.8} // Fixed scale for now to ensure fit
+            // Dynamic scale calculation: Base size 350px. 
+            // If window is smaller, scale down. If larger, can stay 1 or scale up slightly.
+            scale={Math.min(pipSize.width / 350, pipSize.height / 350, 1.2)}
           />
         </div>,
         pipWindow.document.body
