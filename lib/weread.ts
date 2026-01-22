@@ -84,7 +84,12 @@ export const fetchBookmarks = async (bookId: string): Promise<Bookmark[]> => {
       headers: getHeaders()
     });
     if (response.data && Array.isArray(response.data.updated)) {
-      return response.data.updated;
+      // STRICT FILTERING: Only Keep Type 1 (Highlights)
+      // Type 1 = Highlight (原文)
+      // Type 2 = Thought (想法)
+      // Type 4 = Review (书评)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return response.data.updated.filter((b: any) => b.type === 1);
     }
     return [];
   } catch (error: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
