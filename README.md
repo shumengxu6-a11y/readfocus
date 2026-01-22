@@ -64,7 +64,7 @@ npm run dev
 
 本项目已配置 GitHub Actions，支持推送到 GitHub 时自动构建。但由于项目依赖特定的 CookieCloud 数据源：
 1.  **推荐本地运行**：直接使用 `npm run dev` 演示，体验最佳且无需复杂的服务器配置。
-2.  **静态部署 (GitHub Pages)**：可以部署，但需注意 API 路由（数据同步功能）在纯静态环境下不可用。
+2.  **部署**：推荐使用 [Vercel](https://vercel.com/) 进行部署，它完美支持 Next.js 的动态 API 路由。GitHub Pages 仅支持静态站点，不兼容本项目的 API 功能。
 
 ---
 *Created by [xushumeng]*
