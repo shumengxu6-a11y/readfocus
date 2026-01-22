@@ -33,6 +33,23 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  // Document PiP State
+  const [pipWindow, setPipWindow] = useState<Window | null>(null);
+
+  // Mini Widget Mode State
+  const [isCompact, setIsCompact] = useState(false);
+
+  // Define switchMode early (or use via a function that references state setter)
+  // For useImperativeHandle, we simply call the internal implementation
+  const handleSwitchMode = (newMode: TimerMode) => {
+    setMode(newMode);
+    setIsActive(false);
+    if (newMode === 'pomodoro') setTimeLeft(25 * 60);
+    else if (newMode === 'custom') setTimeLeft(customMinutes * 60);
+    else if (newMode === 'break') setTimeLeft(breakMinutes * 60);
+    else if (newMode === 'countup') setCountUpTime(0);
+  };
+
   useImperativeHandle(ref, () => ({
     startBreak: (minutes: number) => {
       setMode('break');
@@ -41,7 +58,7 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
       setIsActive(true);
     },
     switchMode: (newMode: TimerMode) => {
-      switchMode(newMode);
+      handleSwitchMode(newMode);
     }
   }));
 
@@ -75,20 +92,30 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
       video.srcObject = stream;
       video.play().catch(() => { });
     }
-  }, []); // Run once on mount to setup stream connection (Canvas updates are handled by TimerDisplay)
-
-  // Document PiP State
-  const [pipWindow, setPipWindow] = useState<Window | null>(null);
+  }, []); // Run once on mount to setup stream connection
 
   // Close PiP window cleanup
   useEffect(() => {
     if (pipWindow) {
       pipWindow.addEventListener('unload', () => {
         setPipWindow(null);
+        setIsCompact(false); // Reset to standard on close
       });
     }
   }, [pipWindow]);
 
+  const toggleCompact = () => {
+    if (!pipWindow) return;
+    const newCompact = !isCompact;
+    setIsCompact(newCompact);
+
+    // Resize the PiP window based on mode
+    if (newCompact) {
+      pipWindow.resizeTo(300, 150); // Compact Size
+    } else {
+      pipWindow.resizeTo(400, 400); // Standard Size
+    }
+  };
 
   const togglePiP = async () => {
     // 1. Try Document Picture-in-Picture (Best for custom UI)
@@ -102,8 +129,8 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
 
         const dpip = window.documentPictureInPicture as any;
         const noteWindow = await dpip.requestWindow({
-          width: 400,
-          height: 300,
+          width: isCompact ? 300 : 400,
+          height: isCompact ? 150 : 400,
         });
 
         // Copy styles
@@ -206,21 +233,10 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
     else if (mode === 'countup') setCountUpTime(0);
   };
 
-  const switchMode = (newMode: TimerMode) => {
-    setMode(newMode);
-    setIsActive(false);
-    if (newMode === 'pomodoro') setTimeLeft(25 * 60);
-    else if (newMode === 'custom') setTimeLeft(customMinutes * 60);
-    else if (newMode === 'break') setTimeLeft(breakMinutes * 60);
-    else if (newMode === 'countup') setCountUpTime(0);
-  };
-
   return (
     <div className="flex flex-col items-center justify-center p-8 space-y-10 w-full max-w-lg mx-auto transform transition-all">
 
       {/* Hidden Canvas & Video for PiP */}
-      {/* Hidden Canvas & Video for Video PiP Fallback */}
-      {/* TimerDisplay will attach to this canvasRef if visible locally, or we handle it manually if not */}
       <video ref={videoRef} className="hidden" muted playsInline />
 
       {/* Mode Switcher */}
@@ -228,7 +244,7 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
         {(['pomodoro', 'custom', 'countup', 'break'] as TimerMode[]).map((m) => (
           <button
             key={m}
-            onClick={() => switchMode(m)}
+            onClick={() => handleSwitchMode(m)}
             className={clsx(
               "px-5 py-2 rounded-full text-sm font-medium transition-all capitalize",
               mode === m
@@ -242,10 +258,7 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
       </div>
 
       {/* Main Timer Display */}
-      {/* Main Timer Display - Rendered inline or in Portal */}
       {pipWindow ? (
-        // Render 100% nothing here if we moved it to PiP? 
-        // Or keep a placeholder? Let's keep a placeholder or user might get confused.
         <div className="relative group z-10 w-[300px] h-[300px] flex items-center justify-center border-2 border-white/5 rounded-full">
           <span className="text-white/30 text-sm">Timer in Window</span>
         </div>
@@ -262,13 +275,19 @@ const TimerComponent = forwardRef<TimerHandle, TimerProps>(({ onComplete, quote 
 
       {/* Render Portal content if PiP window exists */}
       {pipWindow && createPortal(
-        <div className="flex items-center justify-center w-full h-full scale-75">
+        <div className={clsx(
+          "flex items-center justify-center w-full h-full text-white overflow-hidden",
+          isCompact ? "bg-black" : ""
+        )}>
           <TimerDisplay
             mode={mode}
             timeStr={mode === 'countup' ? formatTime(countUpTime) : formatTime(timeLeft)}
             isActive={isActive}
             totalSeconds={mode === 'custom' ? customMinutes * 60 : (mode === 'break' ? breakMinutes * 60 : 25 * 60)}
             timeLeft={timeLeft}
+            isPiP={true}
+            isCompact={isCompact}
+            onToggleCompact={toggleCompact}
           />
         </div>,
         pipWindow.document.body
