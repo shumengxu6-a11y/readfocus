@@ -22,13 +22,12 @@ export function CookieSetup({ onComplete, isModal = false, onClose }: CookieSetu
     const [syncMessage, setSyncMessage] = useState('');
 
     const handleSync = async () => {
-        if (!cookie) {
-            setError('请先粘贴 Cookie');
-            return;
-        }
+        // Allow trying without cookie (backend might have it via Env/CookieCloud)
 
-        // Save cookie first
-        setUserCookie(cookie);
+        // Save cookie if provided
+        if (cookie) {
+            setUserCookie(cookie);
+        }
 
         setSyncStatus('syncing');
         setSyncProgress(0);
@@ -54,8 +53,13 @@ export function CookieSetup({ onComplete, isModal = false, onClose }: CookieSetu
         } catch (e) {
             console.error('Sync failed', e);
             setSyncStatus('error');
-            setSyncMessage('同步失败，请检查 Cookie 是否有效');
-            setError('同步失败，请重试');
+            setSyncMessage('同步失败，可能需要手动配置 Cookie');
+
+            if (!cookie) {
+                setError('未检测到后端配置，请手动粘贴 Cookie');
+            } else {
+                setError('Cookie 可能已过期，请重新获取');
+            }
         }
     };
 
