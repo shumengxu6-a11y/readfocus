@@ -154,9 +154,12 @@ export const getRandomBookmarkFromBooks = async (books: Book[]): Promise<Bookmar
   // This ensures fair chance for all books
   let candidateBooks = [...booksWithContent].sort(() => 0.5 - Math.random());
 
-  // Fallback if no books have explicit counts
+  // Strict Mode: Do NOT fallback to all books. 
+  // If we have no books with counts, it means we really have no content (or API failed differently).
+  // In that rare case, we return null immediately rather than wasting time checking empty books.
   if (candidateBooks.length === 0) {
-    candidateBooks = [...books].sort(() => 0.5 - Math.random());
+    console.warn('[WeRead] No books with notes/bookmarks found.');
+    return null;
   }
 
   console.log(`[WeRead] Total candidates with content: ${candidateBooks.length}`);
